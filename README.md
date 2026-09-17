@@ -1,156 +1,188 @@
-# Spotify Playlist API — Relatório Power BI
+# Spotify Playlist Tool
 
-## Visão geral
+Integração entre a API do Spotify e o **Microsoft Power BI** usando consultas **Power Query (M)**. O projeto localiza playlists de um usuário, percorre suas faixas com paginação, enriquece os registros com dados de álbuns e artistas e disponibiliza o resultado para análises no relatório Power BI.
 
-Este repositório contém o arquivo `SpotifyPlaylistAPI.pbix`, um relatório desenvolvido no **Microsoft Power BI** para explorar uma biblioteca de músicas organizada em playlists do Spotify. A documentação foi elaborada a partir da inspeção da definição interna do PBIX, do layout do modelo e dos campos utilizados pelos visuais do relatório.
+> **Status da documentação:** baseada na estrutura do repositório, nas consultas M versionadas e no arquivo PBIX incluído. Fórmulas DAX, relacionamentos e configurações internas do modelo semântico devem ser validados no Power BI Desktop.
 
-> Um arquivo `.pbix` pode conter o relatório, o modelo semântico e os dados ou conexões necessários para a sua execução. No Power BI, o modelo semântico é a camada que organiza os dados para análise, incluindo tabelas, cálculos e metadados consumidos pelos visuais [1] [2].
+## Objetivos
 
-O escopo analítico identificado concentra-se em **volume de faixas**, **artistas**, **álbuns**, **gêneros musicais**, **tempo total de escuta**, **última faixa adicionada** e **data da última atualização**. O relatório apresenta uma página denominada `Página 1`, com o título visual `Playlist Report` e a seção principal `Andamento Playlist`.
+O projeto foi desenvolvido para:
 
-## Escopo funcional
+- localizar playlists pertencentes a um usuário do Spotify por palavra-chave;
+- carregar todas as faixas dessas playlists, respeitando a paginação da API;
+- extrair título, artistas, álbum, popularidade, duração e data de adição;
+- obter gêneros e imagem do artista principal;
+- disponibilizar os dados para indicadores, tabelas e filtros no Power BI;
+- separar a transformação principal da normalização de artistas e gêneros.
 
-O relatório foi estruturado para responder perguntas como: quantas faixas estão presentes nas playlists; qual artista possui mais faixas adicionadas; qual artista concentra o maior tempo de escuta; qual álbum e qual gênero possuem maior volume de faixas; qual foi a última música adicionada; e quando ocorreu a última atualização dos dados.
+## Estrutura do repositório
 
-A página também contém elementos de filtragem por texto e seleção, além de tabelas detalhadas que permitem consultar playlists, músicas, álbuns, artistas e datas de adição. A interação entre filtros e visuais segue o comportamento nativo do Power BI, no qual slicers, filtros e demais visuais podem alterar o contexto de consulta dos elementos relacionados [3].
-
-## Inventário técnico do artefato
-
-| Item | Valor identificado |
+| Arquivo | Responsabilidade |
 |---|---|
-| Arquivo principal | `SpotifyPlaylistAPI.pbix` |
-| Tipo de artefato | Relatório Power BI com modelo semântico incorporado ou associado |
-| Versão interna do pacote | `1.32` |
-| Versão da definição do relatório | `3.3.0` |
-| Página publicada | 1 página: `Página 1` |
-| Nome técnico da página | `91e157ba2f45f1295958` |
-| Dimensão do canvas | 1280 × 720 |
-| Ajuste de exibição | `FitToPage` |
-| Tema | `CY26SU05` |
-| Modo de exportação de dados | `AllowSummarized` |
-| Drill e filtros | Drill com filtragem de outros visuais habilitado por padrão |
-| Atualização | Não identificada na definição extraída |
-| Modo de armazenamento | Não identificado na definição extraída |
-| Credenciais e conexão | Não documentadas no pacote analisado |
+| `Spotify Playlist API.pbix` | Relatório Power BI e modelo semântico do projeto. |
+| `SpotifyTracks.m` | Consulta principal: autenticação, busca e filtragem de playlists, chamada da função de faixas e tipagem final. |
+| `GetPlaylistTracks.m` | Função parametrizada que recebe um ID de playlist, pagina as faixas e consulta dados complementares do artista. |
+| `TrackArtists.m` | Consulta auxiliar que separa artistas e gêneros concatenados em colunas individuais. |
+| `README.md` | Documentação de configuração, arquitetura, fluxo e manutenção. |
 
-A presença de `DataModel`, `DiagramLayout`, `Settings` e `Metadata` no pacote confirma que o arquivo possui componentes internos de modelo e configuração. A propriedade `CreatedFrom: Cloud` indica que o artefato foi originado a partir de um contexto de serviço/nuvem, mas não permite, isoladamente, determinar a fonte de dados, o endpoint da API ou a política de atualização.
-
-## Modelo semântico
-
-O modelo apresenta cinco entidades identificadas no layout e nas consultas dos visuais. A organização sugere uma tabela principal de faixas, tabelas auxiliares para agregações de artistas e gêneros, uma entidade de relacionamento ou apoio para artistas por faixa e uma tabela dedicada a medidas.
-
-| Entidade | Papel aparente | Campos observados |
-|---|---|---|
-| `SpotifyTracks` | Tabela principal de faixas e contexto de playlist | `Artistas`, `Nome da Música`, `Nome do Álbum`, `Data Adição`, `Nome da Playlist` |
-| `TrackArtists` | Entidade auxiliar para artistas associados às faixas | `Artista 1` |
-| `TV - Artistas` | Tabela auxiliar ou visão agregada de artistas | `Artista 1`, `Qtd` |
-| `TV - Generos` | Tabela auxiliar ou visão agregada de gêneros | `Genero`, `Qtd` |
-| `Medidas` | Tabela lógica para cálculos e indicadores do relatório | Medidas de volume, tempo, ranking, última atualização e imagens dinâmicas |
-
-### Observação sobre relacionamentos
-
-O arquivo `Metadata` informa que não foram detectados relacionamentos **criados automaticamente** (`AutoCreatedRelationships: []`). Isso não deve ser interpretado como prova de que não existem relacionamentos manuais no modelo. A definição analisada não expôs, de forma legível, o catálogo completo de cardinalidade, direção de filtro e chaves; portanto, esses detalhes devem ser validados no modo **Exibição de Modelo** do Power BI Desktop antes de qualquer alteração estrutural.
-
-## Medidas e indicadores
-
-Os seguintes cálculos foram referenciados pelos visuais por meio da entidade `Medidas`:
-
-| Medida | Finalidade de negócio inferida |
-|---|---|
-| `Total Faixas Playlists` | Quantidade total de faixas nas playlists |
-| `Listening Time` | Tempo total de escuta |
-| `Ultima Musica Adicionada` | Identificação da faixa adicionada mais recentemente |
-| `Porcentagem Volume Playlist` | Participação percentual do volume de faixas |
-| `Nome - Artista com Mais Faixas` | Nome do artista com maior quantidade de faixas |
-| `Qtd - Artista com Mais Faixas` | Quantidade de faixas do artista líder |
-| `Nome - Album com mais faixas` | Nome do álbum com maior quantidade de faixas |
-| `QTD - Album Com Mais Faixas` | Quantidade de faixas do álbum líder |
-| `Nome - Artista com Mais Listening Time` | Nome do artista com maior tempo de escuta |
-| `Qtd - Artista com Mais Listing Time` | Tempo ou quantidade associada ao artista líder em escuta; o nome contém a grafia `Listing` no artefato |
-| `Nome - Genero Com Mais Faixas` | Nome do gênero com maior quantidade de faixas |
-| `Nome - Gênero com Mais Faixas` | Variante acentuada do indicador de gênero, conforme referenciada no relatório |
-| `Qtd - Gênero com Mais Faixas` | Quantidade de faixas do gênero líder |
-| `Ultima Atualização UTC` | Momento da última atualização, em UTC |
-| `Foto - Album Com Mais Faixas` | Imagem associada ao álbum líder |
-| `Foto - Artista com Mais Faixas` | Imagem associada ao artista líder |
-| `Foto - Artista com Mais Listening Time` | Imagem associada ao artista líder em tempo de escuta |
-| `Foto - Artista do Genero top1` | Imagem associada ao artista do gênero principal |
-| `Foto - Ultima Musica Adicionada` | Imagem associada à última faixa adicionada |
-
-A listagem acima representa os nomes e referências disponíveis nos visuais. As expressões DAX completas não foram expostas de forma legível na definição de relatório extraída; por isso, a semântica de cada medida foi documentada como **finalidade inferida**, e não como especificação formal da fórmula. Para auditoria, deve-se abrir o painel **Dados/Fórmula** ou utilizar uma ferramenta de inspeção de modelos tabulares autorizada.
-
-## Campos analíticos
-
-Os principais campos usados diretamente nos visuais são:
-
-| Grupo | Campos |
-|---|---|
-| Playlist e faixa | `Nome da Playlist`, `Nome da Música`, `Nome do Álbum`, `Data Adição` |
-| Artista | `Artistas`, `Artista 1` |
-| Gênero | `Genero` |
-| Quantidade | `Qtd`, `Sum(TV - Artistas.Qtd)`, `Sum(TV - Generos.Qtd)` |
-| Indicadores | Medidas da entidade `Medidas` |
-
-O uso de `Data Adição` indica uma dimensão temporal mínima para ordenar ou identificar recência. Entretanto, não foi encontrada uma tabela calendário explícita entre as entidades expostas no layout. Caso o relatório evolua para análises por mês, semana, ano ou séries temporais, recomenda-se criar e marcar uma dimensão de datas dedicada.
-
-## Composição da página e visuais
-
-A página possui 48 contêineres visuais identificáveis, distribuídos da seguinte forma:
-
-| Tipo de visual | Quantidade | Uso observado ou provável |
-|---|---:|---|
-| Card | 13 | Indicadores resumidos, como total de faixas, tempo de escuta e última atualização |
-| Caixa de texto | 10 | Títulos e textos de apoio |
-| Forma | 8 | Estrutura visual e agrupamento do layout |
-| Imagem | 6 | Capas ou imagens associadas a artistas, álbuns e faixas |
-| Tabela | 3 | Detalhamento de faixas, playlists e artistas |
-| Slicer | 2 | Filtros interativos no canvas |
-| Text Filter | 2 | Pesquisa textual sobre dados do relatório |
-
-Os visuais personalizados empacotados no arquivo são os seguintes:
-
-| Visual | Versão observada | Função |
-|---|---:|---|
-| `Text Filter` | 2.2.9.0 | Pesquisa textual aplicada ao contexto do relatório |
-| `HTML Content` | 1.6.0.0 | Renderização de valores de colunas ou medidas como HTML |
-| `HTML VizCreator Cert` | 2.3.4.0 | Estilização e composição de conteúdo HTML |
-
-Visuais personalizados podem depender de seus pacotes e de compatibilidade com a versão instalada do Power BI Desktop. A documentação oficial recomenda considerar a origem e o ciclo de vida desses visuais ao abrir, publicar ou trabalhar offline com um PBIX [2] [3].
-
-## Fluxo lógico de análise
+## Arquitetura e fluxo de dados
 
 ```mermaid
-flowchart LR
-    A[Spotify / fonte de playlists] --> B[SpotifyTracks]
-    B --> C[TrackArtists]
-    B --> D[TV - Artistas]
-    B --> E[TV - Generos]
-    B --> F[Medidas]
-    C --> G[Cards, tabelas e filtros]
-    D --> G
-    E --> G
-    F --> G
+flowchart TD
+    A[Parâmetros do Spotify] --> B[SpotifyTracks.m]
+    B --> C[POST /api/token]
+    C --> D[Token de acesso]
+    D --> E[GET /users/{id}/playlists]
+    E --> F{Playlist corresponde ao usuário e termo?}
+    F -->|Sim| G[GetPlaylistTracks.m]
+    F -->|Não| H[Descartar]
+    G --> I[GET /playlists/{id}/tracks]
+    I --> J[Paginação de faixas]
+    J --> K[Dados do álbum e da faixa]
+    K --> L[GET /artists/{id}]
+    L --> M[Gêneros e imagem do artista]
+    M --> N[Tabela SpotifyTracks]
+    N --> O[TrackArtists.m]
+    N --> P[Modelo e visuais do Power BI]
+    O --> P
 ```
 
-O diagrama representa o fluxo lógico inferido pelos nomes das entidades e pelos campos referenciados no relatório. Ele não substitui o diagrama formal de relacionamentos do modelo, pois as chaves e a cardinalidade não foram recuperadas de forma legível a partir do pacote.
+### Sequência de execução
 
-## Requisitos para abertura e manutenção
+1. `SpotifyTracks.m` define o ID do cliente, o segredo, o ID do usuário e o termo de busca.
+2. A consulta solicita um token usando o fluxo `client_credentials`.
+3. As playlists do usuário são carregadas em páginas de até 50 itens.
+4. O resultado é filtrado pelo proprietário e por `Search_Term`, sem diferenciação entre maiúsculas e minúsculas.
+5. Para cada playlist encontrada, `GetPlaylistTracks.m` é chamado com o ID correspondente.
+6. As faixas são carregadas em páginas de até 100 itens.
+7. Registros sem faixa válida são removidos e os campos do álbum, faixa e artista são expandidos.
+8. O artista principal é consultado para obter gêneros e imagem.
+9. `TrackArtists.m` divide as listas concatenadas de artistas e gêneros em colunas analíticas.
 
-Para abrir o arquivo, recomenda-se utilizar a versão mais recente do **Power BI Desktop** compatível com o artefato. A documentação da Microsoft alerta que arquivos PBIX baixados ou produzidos em versões mais novas podem não abrir corretamente em versões antigas [2].
+## Configuração
 
-A manutenção deve ser realizada preservando os nomes das medidas e dos campos consumidos pelos visuais. Alterações em `SpotifyTracks`, `TrackArtists`, `TV - Artistas`, `TV - Generos` ou `Medidas` podem quebrar consultas, filtros, imagens dinâmicas e cartões. Antes da publicação, deve-se validar a atualização do modelo, a renderização dos visuais personalizados, os filtros de texto, os cartões e as tabelas detalhadas.
+### Pré-requisitos
 
-Como a conexão e as credenciais não foram identificadas neste inventário, o responsável pela publicação deve confirmar no Power Query e nas configurações do conjunto de dados: a origem efetiva da API, parâmetros de autenticação, paginação, tratamento de erros, limites de requisição, frequência de atualização e dependências de gateway. Modelos em modo Import precisam de atualização para refletir mudanças na origem; modelos DirectQuery dependem da conectividade com a fonte no momento da consulta [1].
+- Microsoft Power BI Desktop;
+- acesso à internet para chamar `accounts.spotify.com` e `api.spotify.com`;
+- uma aplicação criada no [Spotify for Developers](https://developer.spotify.com/dashboard);
+- credenciais de cliente da aplicação;
+- ID do usuário do Spotify;
+- permissão para atualizar consultas Power Query e abrir o arquivo PBIX.
 
-## Qualidade e pontos de atenção
+### Parâmetros necessários
 
-A nomenclatura apresenta variações que merecem padronização futura, como `Genero` e `Gênero`, além de `Listening` e `Listing` no nome de uma medida. Também há dois indicadores semanticamente próximos para gênero (`Nome - Genero Com Mais Faixas` e `Nome - Gênero com Mais Faixas`), o que pode gerar ambiguidade para consumidores e dificultar a manutenção do modelo.
+Os valores usados atualmente nas consultas são:
 
-Recomenda-se definir convenções de nomenclatura, documentar as fórmulas DAX, registrar os relacionamentos e declarar explicitamente o modo de armazenamento. Também é recomendável separar medidas de campos físicos, criar uma tabela calendário se houver evolução temporal e manter um inventário dos visuais personalizados e de suas versões.
+| Parâmetro | Uso |
+|---|---|
+| `Client_ID` | Identifica a aplicação do Spotify. |
+| `Client_Secret` | Autentica a aplicação no endpoint de token. |
+| `User_ID` | Identifica o usuário cujas playlists serão consultadas. |
+| `Search_Term` | Termo usado para filtrar o nome das playlists. |
 
-## Limitações da inspeção
+Para uma instalação segura, esses valores devem ser transformados em parâmetros do Power Query ou em outra forma de configuração protegida. **Não coloque segredos diretamente no código, no README ou em commits.** Se um segredo já tiver sido versionado, ele deve ser revogado e substituído no painel do Spotify.
 
-Esta documentação foi baseada nos metadados do pacote PBIX, na definição JSON do relatório, no layout do diagrama e nas referências de campos usadas pelos visuais. O conteúdo binário do `DataModel` não foi tratado como uma especificação tabular legível; consequentemente, não foram afirmados detalhes que não puderam ser verificados diretamente, como fórmulas DAX completas, tipos de dados, chaves, cardinalidade, direção de filtro, origem exata dos dados, credenciais, política de refresh e regras de segurança em nível de linha.
+### Configuração no Power BI Desktop
 
-> **Importante:** as descrições de negócio das medidas são interpretações baseadas nos nomes e no contexto de uso. A fórmula efetiva deve ser considerada a fonte de verdade para fins de auditoria e governança.
+1. Abra `Spotify Playlist API.pbix`.
+2. No **Editor do Power Query**, localize `SpotifyTracks` e atualize os parâmetros de configuração.
+3. Confirme que a função `GetPlaylistTracks` está disponível com esse nome, pois `SpotifyTracks` a invoca para cada playlist filtrada.
+4. Confirme que `TrackArtists` referencia a consulta `SpotifyTracks`.
+5. Atualize a prévia e valide se as consultas conseguem acessar os endpoints do Spotify.
+6. Revise as credenciais da fonte de dados nas configurações do Power BI.
+7. Atualize o modelo e verifique os visuais antes de publicar ou compartilhar o relatório.
 
+## Consultas Power Query
+
+### `SpotifyTracks.m`
+
+É a consulta orquestradora. Ela obtém o token, lista as playlists do usuário, percorre a paginação por meio do campo `next`, filtra as playlists e expande os dados retornados por `GetPlaylistTracks`.
+
+O resultado final contém, entre outros, os seguintes campos:
+
+- `Nome da Playlist`;
+- `Nome da Música`;
+- `Artistas`;
+- `Nome do Álbum`;
+- `Popularidade`;
+- `Duração (ms)`;
+- `Data Adição`;
+- `Gêneros`;
+- `URL Capa Álbum`;
+- `URL Foto Artista`;
+- `ID Música`;
+- `ID Artista Principal`.
+
+### `GetPlaylistTracks.m`
+
+É uma função com assinatura `(Playlist_ID as text)`. Ela busca as faixas da playlist usando páginas de até 100 itens, remove registros cujo objeto `track` é nulo, extrai informações do álbum e concatena os nomes dos artistas com `; `.
+
+Para o primeiro artista de cada faixa, a função consulta o endpoint de detalhes do artista. Dessa resposta são extraídos os gêneros, separados por `, `, e a primeira imagem disponível.
+
+### `TrackArtists.m`
+
+Seleciona ID, nome, artistas e gêneros a partir de `SpotifyTracks`. Como artistas e gêneros são armazenados em texto delimitado, a consulta calcula dinamicamente a quantidade máxima encontrada e cria colunas como `Artista 1`, `Artista 2`, `Gênero 1` e `Gênero 2`.
+
+Essa transformação é útil para análises tabulares, mas amplia o número de colunas conforme os dados mudam. Para um modelo dimensional mais robusto, considere normalizar artistas e gêneros em tabelas de relacionamento, em vez de criar colunas variáveis.
+
+## API e paginação
+
+| Recurso | Endpoint usado | Tamanho de página |
+|---|---|---:|
+| Token de aplicação | `POST https://accounts.spotify.com/api/token` | — |
+| Playlists do usuário | `GET https://api.spotify.com/v1/users/{user_id}/playlists` | 50 |
+| Faixas da playlist | `GET https://api.spotify.com/v1/playlists/{playlist_id}/tracks` | 100 |
+| Detalhes do artista | `GET https://api.spotify.com/v1/artists/{artist_id}` | 1 por chamada |
+
+A paginação usa o campo `next` retornado pelo Spotify. Quando `next` é nulo, a consulta encerra a geração de páginas.
+
+## Relatório Power BI
+
+O arquivo `Spotify Playlist API.pbix` fornece a camada de apresentação. A definição exata dos visuais e das medidas deve ser conferida no Power BI Desktop, mas o conjunto de dados produzido pelas consultas suporta análises de:
+
+- volume de faixas por playlist, artista, álbum e gênero;
+- popularidade e duração das faixas;
+- tempo total de escuta estimado a partir da duração;
+- última faixa adicionada;
+- capas de álbuns e imagens de artistas;
+- filtros por playlist, faixa, artista e data de adição.
+
+O relatório pode conter medidas e visuais que dependem de nomes específicos. Ao renomear colunas, preserve a compatibilidade com as consultas, medidas e visuais existentes.
+
+## Limitações e comportamento atual
+
+- O fluxo `client_credentials` representa a aplicação, não uma autorização completa do usuário. Endpoints que exigem escopos de usuário ou operações de escrita não estão cobertos por estas consultas.
+- O código não implementa uma política explícita de retry com backoff para limites de requisição, falhas transitórias ou respostas `429`.
+- A consulta de detalhes de artista faz uma chamada individual por faixa, usando apenas o artista principal; isso pode aumentar bastante o tempo de atualização e produzir chamadas repetidas para o mesmo artista.
+- O tratamento de erros em `GetPlaylistTracks` converte falhas de página em `null`, o que pode ocultar a causa de uma atualização incompleta.
+- O filtro depende de correspondência no nome da playlist e pode retornar zero linhas se o termo não for encontrado.
+- A divisão dinâmica de artistas e gêneros em colunas pode dificultar a modelagem quando a quantidade de valores varia entre atualizações.
+
+## Recomendações de manutenção
+
+1. Remover credenciais do código e rotacionar imediatamente qualquer segredo que tenha sido exposto ou versionado.
+2. Extrair parâmetros do Power Query para uma configuração segura e documentar apenas nomes, não valores secretos.
+3. Criar uma camada de cache ou uma consulta distinta de artistas para evitar chamadas repetidas.
+4. Implementar tratamento explícito de `401`, `404`, `429` e erros `5xx`, incluindo registro ou indicador de atualização parcial.
+5. Considerar tabelas normalizadas de faixas, artistas, gêneros e playlists para reduzir a dependência de colunas dinâmicas.
+6. Validar no Power BI os tipos de dados, relacionamentos, medidas, credenciais e frequência de atualização.
+7. Adicionar uma tabela calendário caso o relatório evolua para análises por mês, semana ou ano.
+
+## Checklist de validação
+
+- [ ] As credenciais estão armazenadas fora do código versionado.
+- [ ] O ID do usuário e o termo de busca são válidos.
+- [ ] A função `GetPlaylistTracks` está nomeada exatamente como esperado.
+- [ ] A atualização percorre mais de uma página quando necessário.
+- [ ] Playlists de outro proprietário não aparecem no resultado.
+- [ ] Faixas removidas ou indisponíveis não interrompem a atualização.
+- [ ] Os tipos de `Popularidade`, `Duração (ms)` e `Data Adição` estão corretos.
+- [ ] Medidas e visuais do PBIX continuam renderizando.
+- [ ] Os limites de requisição do Spotify são respeitados.
+
+## Licença e responsabilidade
+
+Este repositório não informa uma licença de software. Antes de redistribuir o código, o relatório ou dados derivados, defina uma licença e confirme as condições de uso da API e dos dados do Spotify.
+
+O uso da marca, das imagens e dos dados do Spotify deve respeitar os [termos da plataforma](https://developer.spotify.com/terms) e as políticas aplicáveis.
